@@ -57,13 +57,16 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Display conversation history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 # --- 6. CHAT LOGIC ---
 if prompt := st.chat_input("Ask Albert about your file or the web..."):
+    # Add user message to session state immediately
     st.session_state.messages.append({"role": "user", "content": prompt})
+    
     with st.chat_message("user"):
         st.markdown(prompt)
 
@@ -71,44 +74,53 @@ if prompt := st.chat_input("Ask Albert about your file or the web..."):
         file_context = ""
         is_image = False
         
-        # Check if a file is uploaded
+        # File Handling
         if uploaded_file:
             if uploaded_file.type.startswith("image"):
                 is_image = True
+                # Note: We don't save the base64 string to history to keep it lightweight
                 base64_image = encode_image(uploaded_file)
             else:
                 with st.spinner("Albert is reading your document..."):
                     file_context = extract_text(uploaded_file)
 
-        # Build the Prompt
+        # Web Search Context
         with st.status("🔍 Analyzing...", expanded=False):
             web_info = get_web_context(prompt)
             
-        full_prompt = f"File Content: {file_context}\n\nWeb Content: {web_info}\n\nUser Question: {prompt}"
+        # --- MEMORY CONSTRUCTION ---
+        # We prepare a list of messages to send to Groq that includes the history
+        messages_to_send = []
         
+        # 1. Add previous history (excluding the current prompt we just added)
+        for m in st.session_state.messages[:-1]:
+            messages_to_send.append({"role": m["role"], "content": m["content"]})
+        
+        # 2. Add the current prompt with its specific file/web context
+        if is_image:
+            messages_to_send.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                ]
+            })
+        else:
+            # Combine the web/file info with the prompt for this specific turn
+            contextual_prompt = f"File Content: {file_context}\nWeb Info: {web_info}\nUser Question: {prompt}"
+            messages_to_send.append({"role": "user", "content": contextual_prompt})
+
         response_placeholder = st.empty()
         full_response = ""
 
         try:
-            # Using the new vision model for images
+            # Model Selection
             model_to_use = "meta-llama/llama-4-scout-17b-16e-instruct" if is_image else "llama-3.3-70b-versatile"
             
-            # Prepare messages
-            messages = []
-            if is_image:
-                messages.append({
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                    ]
-                })
-            else:
-                messages.append({"role": "user", "content": full_prompt})
-
+            # Request completion with FULL MESSAGE HISTORY
             stream = client.chat.completions.create(
                 model=model_to_use,
-                messages=messages,
+                messages=messages_to_send, 
                 stream=True,
             )
             
@@ -121,4 +133,5 @@ if prompt := st.chat_input("Ask Albert about your file or the web..."):
         except Exception as e:
             st.error(f"Albert error: {str(e)}")
 
+    # Add Albert's final answer to history
     st.session_state.messages.append({"role": "assistant", "content": full_response})
