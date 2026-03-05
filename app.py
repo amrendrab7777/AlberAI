@@ -52,8 +52,8 @@ def get_web_context(query):
         return ""
 
 # --- 4. UI SETUP ---
-st.title("🤖 Albert: Your 2026 AI Assistant")
-st.markdown("---")
+st.title("🤖 I am Albert")
+st.caption("2026 Edition: Vision • Research • Unstoppable Art")
 
 with st.sidebar:
     st.header("Settings & Files")
@@ -70,55 +70,58 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # --- 5. CHAT LOGIC ---
-if prompt := st.chat_input("Draw me a futuristic car... or ask a question"):
+if prompt := st.chat_input("Draw me a neon city... or ask a question"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        # --- PATH A: IMAGE GENERATION (RELIABLE 2026 LOGIC) ---
+        # --- PATH A: UNSTOPPABLE IMAGE GENERATION ---
         img_triggers = ["draw", "generate", "image", "paint", "picture", "create"]
         if any(word in prompt.lower() for word in img_triggers):
             status_box = st.status("🎨 Albert is creating art...", expanded=True)
             
-            # 1. Expand Prompt using Llama
-            enhance_cmd = f"Rewrite this as a high-detail 4k AI art prompt: '{prompt}'. Focus on lighting/style. No preamble, just the prompt."
+            # 1. Expand Prompt (SHORT & SWEET - Max 25 words)
+            enhance_cmd = f"Rewrite as a 4k art prompt: '{prompt}'. Style: cinematic. UNDER 25 WORDS. No preamble."
             try:
                 enh_resp = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": enhance_cmd}])
                 art_prompt = enh_resp.choices[0].message.content
             except:
                 art_prompt = prompt
 
-            # 2. Build Unified URL
+            # 2. Build URL
             clean_art = urllib.parse.quote(art_prompt.strip())
             seed = random.randint(1, 999999)
-            # gen.pollinations.ai is the stable 2026 endpoint
             image_url = f"https://gen.pollinations.ai/prompt/{clean_art}?width=1024&height=1024&nologo=true&seed={seed}&cache={time.time()}"
             
-            # 3. Validation Loop
+            # 3. Resilient Validation Loop
             image_ready = False
-            for i in range(10): # Try for 20 seconds
-                status_box.update(label=f"🖌️ Painting... (Attempt {i+1}/10)", state="running")
+            for i in range(12): # 12 second patience
+                status_box.update(label=f"🖌️ Painting... ({i+1}/12s)", state="running")
                 try:
-                    r = requests.get(image_url, timeout=10)
-                    if r.status_code == 200 and len(r.content) > 10000: # 10kb check ensures it's a real image
+                    # Fast Header check
+                    r = requests.head(image_url, timeout=5)
+                    if r.status_code == 200:
                         image_ready = True
                         break
                 except:
                     pass
-                time.sleep(2)
+                time.sleep(1)
 
             if image_ready:
                 status_box.update(label="✅ Masterpiece Complete!", state="complete")
-                st.image(image_url, caption=f"Albert's creation for: {prompt}")
+                st.image(image_url, caption=f"Prompt: {art_prompt}")
                 st.markdown(f"**[💾 Download High-Res]({image_url})**")
-                full_response = f"I've generated that image! Prompt used: *{art_prompt}*"
+                full_response = f"I've painted that for you! Prompt used: *{art_prompt}*"
             else:
-                status_box.update(label="❌ Artist's Block (Server Timeout)", state="error")
-                st.error("The art server didn't respond in time. Please try a simpler prompt.")
-                full_response = "Sorry, I couldn't render that image right now."
+                # EMERGENCY FALLBACK: Simple Prompt
+                status_box.update(label="⚠️ Server Busy - Using Quick Mode", state="running")
+                fallback_url = f"https://gen.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?seed={seed}"
+                st.image(fallback_url, caption="Albert's Quick Sketch")
+                status_box.update(label="✅ Quick Sketch Complete", state="complete")
+                full_response = "The detailed version timed out, so I made a quick sketch for you!"
 
-        # --- PATH B: TEXT / VISION ---
+        # --- PATH B: TEXT / VISION / RESEARCH ---
         else:
             file_txt, is_img, b64_img = "", False, None
             if uploaded_file:
@@ -130,13 +133,14 @@ if prompt := st.chat_input("Draw me a futuristic car... or ask a question"):
             with st.status("🔍 Researching...", expanded=False):
                 web_info = get_web_context(prompt)
             
+            # Build memory history
             history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[:-1]]
             
             if is_img:
                 history.append({
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": f"Web Info: {web_info}\n\nQuestion: {prompt}"},
+                        {"type": "text", "text": f"Context: {web_info}\n\nQ: {prompt}"},
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}}
                     ]
                 })
