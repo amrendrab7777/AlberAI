@@ -22,7 +22,7 @@ st.markdown("""
 client = setup_client()
 
 # --- 3. UI SETUP ---
-st.title("🤖 I am Albert an AI")
+st.title("🤖 I am Albert")
 st.caption("2026 Edition: Vision • Research • Unstoppable Art")
 
 with st.sidebar:
