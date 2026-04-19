@@ -6,22 +6,19 @@ from chat_handler import handle_text_chat
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="Albert", page_icon="🤖", layout="wide")
 
+# --- 2. MOBILE FIX: Disable Pull to Refresh ---
 st.markdown("""
     <style>
-        /* Disable pull to refresh */
-        body {
-            overscroll-behavior-y: contain;
-        }
-        .main {
-            overscroll-behavior-y: contain;
-        }
+        * { overscroll-behavior-y: none !important; }
+        html, body { overscroll-behavior-y: none !important; }
+        .main, .block-container { overscroll-behavior-y: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SECURE API LOADING ---
+# --- 3. SECURE API LOADING ---
 client = setup_client()
 
-# --- 3. UI SETUP ---
+# --- 4. UI SETUP ---
 st.title("🤖 I am Albert")
 st.caption("2026 Edition: Vision • Research • Unstoppable Art")
 
@@ -37,9 +34,17 @@ if "messages" not in st.session_state:
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+        # FIX: Render image URLs stored in history
+        if msg["content"].startswith("__IMAGE__"):
+            image_url = msg["content"].replace("__IMAGE__", "")
+            st.markdown(
+                f'<img src="{image_url}" width="100%" style="border-radius: 12px;" />',
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(msg["content"])
 
-# --- 4. CHAT LOGIC ---
+# --- 5. CHAT LOGIC ---
 if prompt := st.chat_input("Draw me a neon city... or ask a question"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
