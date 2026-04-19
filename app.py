@@ -32,10 +32,10 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# --- Render chat history ---
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        # FIX: Render image URLs stored in history
-        if msg["content"].startswith("__IMAGE__"):
+        if isinstance(msg["content"], str) and msg["content"].startswith("__IMAGE__"):
             image_url = msg["content"].replace("__IMAGE__", "")
             st.markdown(
                 f'<img src="{image_url}" width="100%" style="border-radius: 12px;" />',
@@ -51,9 +51,21 @@ if prompt := st.chat_input("Draw me a neon city... or ask a question"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        img_triggers = ["draw", "generate", "image", "paint", "picture", "create"]
+        # FIX: Stricter multi-word triggers to avoid false positives on
+        # normal questions containing "image", "picture", "create", etc.
+        img_triggers = [
+            "draw me", "draw a", "draw an",
+            "generate an image", "generate a picture", "generate art",
+            "paint me", "paint a", "paint an",
+            "create an image", "create a picture", "create art",
+            "make an image", "make a picture", "make art",
+            "show me a picture", "show me an image",
+        ]
 
-        if any(word in prompt.lower() for word in img_triggers):
+        prompt_lower = prompt.lower()
+        is_image_request = any(trigger in prompt_lower for trigger in img_triggers)
+
+        if is_image_request:
             # --- PATH A: IMAGE GENERATION ---
             full_response = handle_image_generation(prompt, client)
         else:
