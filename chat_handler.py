@@ -31,15 +31,18 @@ def handle_text_chat(prompt, client, uploaded_file, messages):
         model = "llama-3.3-70b-versatile"
 
     resp_placeholder = st.empty()
-    full_response = ""
+    # FIX: Default response message so history never saves empty string
+    full_response = "Sorry, I ran into an issue. Please try again."
     try:
         stream = client.chat.completions.create(model=model, messages=history, stream=True)
+        full_response = ""
         for chunk in stream:
             if chunk.choices[0].delta.content:
                 full_response += chunk.choices[0].delta.content
                 resp_placeholder.markdown(full_response + "▌")
         resp_placeholder.markdown(full_response)
     except Exception as e:
+        resp_placeholder.markdown(full_response)
         st.error(f"Error: {str(e)}")
 
     return full_response
